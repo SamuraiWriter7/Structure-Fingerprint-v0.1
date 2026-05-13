@@ -1,0 +1,476 @@
+spec:
+  name: structure-fingerprint
+  title: Structure Fingerprint Specification
+  version: "0.1.0"
+  status: draft
+  license: CC0-1.0
+  language: ja
+  description: >
+    Structure Fingerprint is a minimal specification for representing
+    multi-layer evidence about a text artifact, separating proof-oriented
+    provenance from inference-oriented structural similarity.
+
+principles:
+  - id: separation-of-layers
+    statement: >
+      Proof-oriented evidence and inference-oriented evidence MUST be stored
+      and validated in separate namespaces.
+  - id: deterministic-recomputation
+    statement: >
+      A fingerprint MUST be reproducible from the same input text under the
+      same canonicalization profile and model versions.
+  - id: no-single-source-of-truth
+    statement: >
+      A structure fingerprint does NOT assert absolute authorship or absolute
+      origin; it represents evidence for lineage, proximity, and origin
+      candidacy.
+  - id: explicit-uncertainty
+    statement: >
+      Uncertainty and attack-risk signals MUST be recorded explicitly and MUST
+      NOT be merged silently into provenance evidence.
+
+object_model:
+  primary_object: structure_fingerprint
+  identifier_format: "sfp:{namespace}:{id}"
+  namespace_rule: >
+    The following namespaces SHOULD be used:
+    proof.*, inference.*, risk.*, canon.*, meta.*
+
+canonicalization_profiles:
+  default_profile:
+    profile_id: canon:text:default:v0.1
+    description: Minimal canonicalization profile for text artifacts
+    rules:
+      unicode_normalization: NFKC
+      line_endings: LF
+      trim_trailing_whitespace: true
+      collapse_multiple_blank_lines: false
+      preserve_paragraph_boundaries: true
+      markdown_policy: preserve
+      url_policy: preserve
+      quote_policy: preserve
+      language_detection: optional
+      sentence_segmentation:
+        enabled: true
+        version: "default-v1"
+
+structure_fingerprint:
+  required_fields:
+    - meta
+    - canon
+    - proof
+    - inference
+    - risk
+
+  fields:
+    meta:
+      type: object
+      required:
+        - fingerprint_id
+        - created_at
+        - spec_version
+      properties:
+        fingerprint_id:
+          type: string
+          description: Unique identifier for this fingerprint object
+          example: "sfp:kazene:note-0001"
+        source_object_id:
+          type: string
+          description: Optional upstream content identifier
+        source_uri:
+          type: string
+          description: Canonical source URI if available
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          description: System or agent that produced this fingerprint
+        spec_version:
+          type: string
+          const: "0.1.0"
+        content_type:
+          type: string
+          default: "text/plain"
+        language:
+          type: string
+          example: "ja"
+
+    canon:
+      type: object
+      required:
+        - profile_id
+        - canonical_text_hash
+      properties:
+        profile_id:
+          type: string
+          example: "canon:text:default:v0.1"
+        canonical_text_hash:
+          type: object
+          required:
+            - algorithm
+            - value
+          properties:
+            algorithm:
+              type: string
+              enum:
+                - sha3-256
+                - sha256
+            value:
+              type: string
+              description: Hash of canonicalized text
+        canonical_length:
+          type: integer
+          minimum: 0
+        sentence_count:
+          type: integer
+          minimum: 0
+        paragraph_count:
+          type: integer
+          minimum: 0
+
+    proof:
+      type: object
+      description: Proof-oriented evidence namespace
+      properties:
+        hard_binding:
+          type: object
+          properties:
+            content_hash:
+              type: object
+              properties:
+                algorithm:
+                  type: string
+                  enum:
+                    - sha3-256
+                    - sha256
+                value:
+                  type: string
+            perceptual_hash:
+              type: object
+              description: Optional perceptual hash for rendered text artifact
+              properties:
+                algorithm:
+                  type: string
+                value:
+                  type: string
+        provenance:
+          type: object
+          properties:
+            manifest_type:
+              type: string
+              enum:
+                - c2pa
+                - none
+                - other
+            manifest_ref:
+              type: string
+            signing_status:
+              type: string
+              enum:
+                - verified
+                - unverified
+                - absent
+            signed_at:
+              type: string
+              format: date-time
+            publisher:
+              type: string
+            uri:
+              type: string
+            citation_links:
+              type: array
+              items:
+                type: string
+            publication_time:
+              type: string
+              format: date-time
+
+    inference:
+      type: object
+      description: Inference-oriented evidence namespace
+      required:
+        - model_versions
+      properties:
+        model_versions:
+          type: object
+          properties:
+            style_model:
+              type: string
+            discourse_model:
+              type: string
+            rhetoric_model:
+              type: string
+        style_embedding:
+          type: object
+          properties:
+            vector_ref:
+              type: string
+              description: Reference to external vector store entry
+            dimension:
+              type: integer
+            similarity_metric:
+              type: string
+              enum:
+                - cosine
+                - dot
+                - euclidean
+        discourse_graph:
+          type: object
+          properties:
+            graph_ref:
+              type: string
+              description: Reference to serialized discourse graph
+            node_types:
+              type: array
+              items:
+                type: string
+              example:
+                - claim
+                - support
+                - contrast
+                - abstraction
+                - definition
+            edge_types:
+              type: array
+              items:
+                type: string
+              example:
+                - supports
+                - contrasts
+                - elaborates
+                - defines
+            explanation_spans:
+              type: array
+              items:
+                type: object
+                properties:
+                  span_id:
+                    type: string
+                  start_char:
+                    type: integer
+                  end_char:
+                    type: integer
+                  mapped_node_id:
+                    type: string
+        rhetorical_profile:
+          type: object
+          properties:
+            operators:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: contrast
+                  weight:
+                    type: number
+                    minimum: 0.0
+                    maximum: 1.0
+            distribution_sum_rule:
+              type: string
+              default: "weights SHOULD sum approximately to 1.0"
+
+    risk:
+      type: object
+      description: Risk and uncertainty namespace
+      properties:
+        attack_risk:
+          type: object
+          properties:
+            obfuscation_score:
+              type: number
+              minimum: 0.0
+              maximum: 1.0
+            impersonation_score:
+              type: number
+              minimum: 0.0
+              maximum: 1.0
+            paraphrase_resilience:
+              type: string
+              enum:
+                - high
+                - medium
+                - low
+        uncertainty:
+          type: object
+          properties:
+            confidence:
+              type: number
+              minimum: 0.0
+              maximum: 1.0
+            interval:
+              type: object
+              properties:
+                lower:
+                  type: number
+                upper:
+                  type: number
+            model_disagreement:
+              type: number
+              minimum: 0.0
+              maximum: 1.0
+            notes:
+              type: string
+
+evidence_classification:
+  description: >
+    Evidence class MUST be derived primarily from proof-oriented evidence, and
+    MAY be refined by inference-oriented evidence and risk signals.
+  classes:
+    - id: A
+      label: strong_provenance
+      rule: >
+        Verified provenance or equivalent hard-binding chain is present and
+        consistent with the canonical text.
+    - id: B
+      label: soft_provenance
+      rule: >
+        Publication metadata and source continuity are present, but cryptographic
+        verification is partial or absent.
+    - id: C
+      label: structural_match
+      rule: >
+        Structural similarity is strong, but provenance proof is weak or absent.
+    - id: D
+      label: surface_similarity
+      rule: >
+        Only shallow or partial similarity is observed.
+
+comparison:
+  description: Minimal comparison result object for lineage analysis
+  comparison_result:
+    required_fields:
+      - left_fingerprint_id
+      - right_fingerprint_id
+      - evidence_class
+    properties:
+      left_fingerprint_id:
+        type: string
+      right_fingerprint_id:
+        type: string
+      evidence_class:
+        type: string
+        enum: [A, B, C, D]
+      proximity_score:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      proof_strength:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      origin_candidate:
+        type: boolean
+      lineage_relation:
+        type: string
+        enum:
+          - possible_origin
+          - descendant
+          - sibling
+          - paraphrase_variant
+          - unrelated
+      explanation:
+        type: string
+
+allocation_guidance:
+  description: >
+    Allocation decisions SHOULD be computed downstream and MUST NOT be embedded
+    as intrinsic truth claims inside the fingerprint object itself.
+  recommended_formula:
+    expression: "eligibility(evidence_class) * proof_strength * proximity_score * context_weight"
+  notes:
+    - "Eligibility SHOULD be determined before proportional allocation."
+    - "Class A SHOULD receive higher default eligibility than Class B/C/D."
+    - "Risk signals MAY reduce allocation confidence but MUST remain auditable."
+
+validation_rules:
+  - id: required-layer-separation
+    statement: >
+      proof.*, inference.*, risk.*, canon.*, and meta.* MUST be distinguishable
+      in storage and validation.
+  - id: reproducibility
+    statement: >
+      Recomputing the fingerprint with identical input, canonicalization
+      profile, and model versions SHOULD produce the same canon hash and
+      materially equivalent inference outputs.
+  - id: versioning
+    statement: >
+      Any change to canonicalization logic or model versions MUST be recorded.
+  - id: no-authorship-absolute-claim
+    statement: >
+      This specification MUST NOT be interpreted as absolute authorship proof.
+
+minimal_example:
+  structure_fingerprint:
+    meta:
+      fingerprint_id: "sfp:kazene:note-0001"
+      source_object_id: "note-article-0001"
+      source_uri: "https://example.com/articles/0001"
+      created_at: "2026-05-13T10:00:00Z"
+      created_by: "sf-extractor-v0.1"
+      spec_version: "0.1.0"
+      content_type: "text/markdown"
+      language: "ja"
+
+    canon:
+      profile_id: "canon:text:default:v0.1"
+      canonical_text_hash:
+        algorithm: "sha3-256"
+        value: "8b7e6d5c4a3f2e1d..."
+      canonical_length: 5234
+      sentence_count: 118
+      paragraph_count: 34
+
+    proof:
+      hard_binding:
+        content_hash:
+          algorithm: "sha3-256"
+          value: "8b7e6d5c4a3f2e1d..."
+      provenance:
+        manifest_type: "none"
+        signing_status: "absent"
+        publisher: "example-publisher"
+        uri: "https://example.com/articles/0001"
+        publication_time: "2026-05-12T23:40:00Z"
+
+    inference:
+      model_versions:
+        style_model: "style-distance-ja-v0.1"
+        discourse_model: "discourse-graph-ja-v0.1"
+        rhetoric_model: "rhetoric-profile-ja-v0.1"
+      style_embedding:
+        vector_ref: "vecdb://fingerprints/sfp:kazene:note-0001"
+        dimension: 768
+        similarity_metric: "cosine"
+      discourse_graph:
+        graph_ref: "graphdb://fingerprints/sfp:kazene:note-0001"
+        node_types: ["claim", "support", "contrast", "definition"]
+        edge_types: ["supports", "contrasts", "defines"]
+        explanation_spans:
+          - span_id: "sp1"
+            start_char: 0
+            end_char: 84
+            mapped_node_id: "n1"
+      rhetorical_profile:
+        operators:
+          - name: "definition"
+            weight: 0.28
+          - name: "contrast"
+            weight: 0.19
+          - name: "generalization"
+            weight: 0.17
+
+    risk:
+      attack_risk:
+        obfuscation_score: 0.11
+        impersonation_score: 0.07
+        paraphrase_resilience: "medium"
+      uncertainty:
+        confidence: 0.78
+        interval:
+          lower: 0.71
+          upper: 0.84
+        model_disagreement: 0.13
+        notes: "No verified signature; inference derived from text only."
