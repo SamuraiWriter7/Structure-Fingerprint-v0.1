@@ -1,10 +1,24 @@
 # Structure Fingerprint v0.1
 
-A minimal specification for representing **multi-layer evidence** about a text artifact by separating:
+A minimal specification for representing multi-layer evidence about a text artifact by separating proof-oriented provenance, inference-oriented structural similarity, and risk/uncertainty signals.
+This repository provides a JSON Schema, valid/invalid examples, and CI validation for structure-aware trace and lineage workflows.
 
-- proof-oriented provenance
-- inference-oriented structural similarity
-- risk and uncertainty signals
+---
+
+## Overview
+
+Historically, proving “who said it first” was difficult, especially when text was
+copied, paraphrased, partially quoted, or reposted without durable provenance.
+
+Structure Fingerprint v0.1 treats that problem as an engineering problem rather
+than a purely interpretive one.
+
+The core design principle is simple:
+
+- **proof-oriented evidence** and
+- **inference-oriented evidence**
+
+must be stored and validated separately.
 
 This specification does **not** claim absolute authorship or absolute origin.
 Instead, it defines a reproducible evidence object for reasoning about:
@@ -12,33 +26,7 @@ Instead, it defines a reproducible evidence object for reasoning about:
 - lineage
 - proximity
 - origin candidacy
-- downstream trace-based allocation
-
----
-
-## Overview
-
-Historically, proving “who said it first” was difficult in many cases,
-especially when content was copied, paraphrased, partially quoted, or reposted
-without durable provenance.
-
-`Structure Fingerprint v0.1` is a minimal specification for handling that problem
-as an engineering task.
-
-The core idea is simple:
-
-- **proof-oriented evidence** and
-- **inference-oriented evidence**
-
-must be stored and validated separately.
-
-In other words, this specification distinguishes between:
-
-- evidence that is closer to **proof**
-- evidence that is closer to **inference**
-
-This separation makes it possible to design trace systems without collapsing
-provenance, structural similarity, and uncertainty into a single opaque score.
+- downstream trace-aware allocation
 
 ---
 
@@ -60,7 +48,7 @@ This specification does **not** attempt to provide:
 
 - absolute authorship proof
 - legal truth by itself
-- a universal scoring formula for allocation
+- a universal allocation formula
 - a complete discourse parser or style engine
 - a final standard for provenance interoperability
 
@@ -159,21 +147,21 @@ Risk and uncertainty signals, such as:
 
 ```text
 .
-├── README.md
+├── .github/
+│   └── workflows/
+│       └── validate-specs.yml
+├── examples/
+│   ├── invalid/
+│   └── structure-fingerprint.sample.json
 ├── schemas/
 │   └── structure-fingerprint-v0.1.schema.json
-├── examples/
-│   ├── structure-fingerprint.sample.json
-│   └── invalid/
-│       ├── missing-required-meta.schema-fail.json
-│       ├── invalid-fingerprint-id.schema-fail.json
-│       ├── span-order.semantic-fail.json
-│       └── interval-order.semantic-fail.json
-└── .github/
-    └── workflows/
-        └── validate-specs.yml
+├── LICENSE
+├── README.md
+└── structure-fingerprint-v0.1.yaml
 Specification Files
 Main files
+structure-fingerprint-v0.1.yaml
+human-readable source specification
 schemas/structure-fingerprint-v0.1.schema.json
 JSON Schema (Draft 2020-12) for validating a Structure Fingerprint object
 examples/structure-fingerprint.sample.json
@@ -479,8 +467,6 @@ shape is validated by JSON Schema
 meaning is validated by semantic checks
 allocation is handled downstream
 truth claims are never silently inferred from structural similarity alone
-
-This helps preserve interpretability and auditability.
 
 A structurally similar text is not automatically proof of origin.
 
