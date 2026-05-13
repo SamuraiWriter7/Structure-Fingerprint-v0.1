@@ -1,0 +1,440 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/structure-fingerprint-v0.1.schema.json",
+  "title": "Structure Fingerprint v0.1",
+  "description": "JSON Schema for validating a Structure Fingerprint object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "meta",
+    "canon",
+    "proof",
+    "inference",
+    "risk"
+  ],
+  "properties": {
+    "meta": {
+      "$ref": "#/$defs/meta"
+    },
+    "canon": {
+      "$ref": "#/$defs/canon"
+    },
+    "proof": {
+      "$ref": "#/$defs/proof"
+    },
+    "inference": {
+      "$ref": "#/$defs/inference"
+    },
+    "risk": {
+      "$ref": "#/$defs/risk"
+    }
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hashObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "value"
+      ],
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "enum": [
+            "sha3-256",
+            "sha256"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "dateTimeString": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fingerprint_id",
+        "created_at",
+        "spec_version"
+      ],
+      "properties": {
+        "fingerprint_id": {
+          "type": "string",
+          "pattern": "^sfp:[A-Za-z0-9._-]+:[A-Za-z0-9._:-]+$"
+        },
+        "source_object_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "source_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "created_at": {
+          "$ref": "#/$defs/dateTimeString"
+        },
+        "created_by": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "spec_version": {
+          "type": "string",
+          "const": "0.1.0"
+        },
+        "content_type": {
+          "type": "string",
+          "default": "text/plain"
+        },
+        "language": {
+          "type": "string",
+          "minLength": 2
+        }
+      }
+    },
+    "canon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "canonical_text_hash"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "pattern": "^canon:[A-Za-z0-9._-]+:[A-Za-z0-9._-]+:v[0-9]+(\\.[0-9]+)?$"
+        },
+        "canonical_text_hash": {
+          "$ref": "#/$defs/hashObject"
+        },
+        "canonical_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sentence_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "paragraph_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hard_binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "content_hash": {
+              "$ref": "#/$defs/hashObject"
+            },
+            "perceptual_hash": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "algorithm",
+                "value"
+              ],
+              "properties": {
+                "algorithm": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "value": {
+                  "$ref": "#/$defs/nonEmptyString"
+                }
+              }
+            }
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "manifest_type": {
+              "type": "string",
+              "enum": [
+                "c2pa",
+                "none",
+                "other"
+              ]
+            },
+            "manifest_ref": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "signing_status": {
+              "type": "string",
+              "enum": [
+                "verified",
+                "unverified",
+                "absent"
+              ]
+            },
+            "signed_at": {
+              "$ref": "#/$defs/dateTimeString"
+            },
+            "publisher": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "uri": {
+              "type": "string",
+              "format": "uri"
+            },
+            "citation_links": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "publication_time": {
+              "$ref": "#/$defs/dateTimeString"
+            }
+          }
+        }
+      }
+    },
+    "modelVersions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "style_model": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "discourse_model": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "rhetoric_model": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "styleEmbedding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "vector_ref": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "dimension": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "similarity_metric": {
+          "type": "string",
+          "enum": [
+            "cosine",
+            "dot",
+            "euclidean"
+          ]
+        }
+      }
+    },
+    "explanationSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "span_id",
+        "start_char",
+        "end_char",
+        "mapped_node_id"
+      ],
+      "properties": {
+        "span_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "start_char": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_char": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mapped_node_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "start_char",
+              "end_char"
+            ]
+          },
+          "then": {
+            "properties": {
+              "end_char": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "discourseGraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "graph_ref": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "node_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "edge_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "explanation_spans": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/explanationSpan"
+          }
+        }
+      }
+    },
+    "rhetoricalOperator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "weight"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "rhetoricalProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operators": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rhetoricalOperator"
+          }
+        },
+        "distribution_sum_rule": {
+          "type": "string",
+          "default": "weights SHOULD sum approximately to 1.0"
+        }
+      }
+    },
+    "inference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_versions"
+      ],
+      "properties": {
+        "model_versions": {
+          "$ref": "#/$defs/modelVersions"
+        },
+        "style_embedding": {
+          "$ref": "#/$defs/styleEmbedding"
+        },
+        "discourse_graph": {
+          "$ref": "#/$defs/discourseGraph"
+        },
+        "rhetorical_profile": {
+          "$ref": "#/$defs/rhetoricalProfile"
+        }
+      }
+    },
+    "attackRisk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "obfuscation_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "impersonation_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "paraphrase_resilience": {
+          "type": "string",
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        }
+      }
+    },
+    "uncertaintyInterval": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interval": {
+          "$ref": "#/$defs/uncertaintyInterval"
+        },
+        "model_disagreement": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "attack_risk": {
+          "$ref": "#/$defs/attackRisk"
+        },
+        "uncertainty": {
+          "$ref": "#/$defs/uncertainty"
+        }
+      }
+    }
+  }
+}
