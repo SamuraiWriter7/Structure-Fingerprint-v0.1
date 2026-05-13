@@ -1,0 +1,118 @@
+{
+  "meta": {
+    "fingerprint_id": "sfp:kazene:note-0001",
+    "source_object_id": "note-article-0001",
+    "source_uri": "https://example.com/articles/0001",
+    "created_at": "2026-05-13T10:00:00Z",
+    "created_by": "sf-extractor-v0.1",
+    "spec_version": "0.1.0",
+    "content_type": "text/markdown",
+    "language": "ja"
+  },
+  "canon": {
+    "profile_id": "canon:text:default:v0.1",
+    "canonical_text_hash": {
+      "algorithm": "sha3-256",
+      "value": "8b7e6d5c4a3f2e1d9c8b7a6f5e4d3c2b1a0987654321fedcba9876543210abcd"
+    },
+    "canonical_length": 5234,
+    "sentence_count": 118,
+    "paragraph_count": 34
+  },
+  "proof": {
+    "hard_binding": {
+      "content_hash": {
+        "algorithm": "sha3-256",
+        "value": "8b7e6d5c4a3f2e1d9c8b7a6f5e4d3c2b1a0987654321fedcba9876543210abcd"
+      },
+      "perceptual_hash": {
+        "algorithm": "simhash64",
+        "value": "9f37ac42d18b7701"
+      }
+    },
+    "provenance": {
+      "manifest_type": "none",
+      "signing_status": "absent",
+      "publisher": "example-publisher",
+      "uri": "https://example.com/articles/0001",
+      "citation_links": [
+        "https://example.com/articles/source-a",
+        "https://example.com/articles/source-b"
+      ],
+      "publication_time": "2026-05-12T23:40:00Z"
+    }
+  },
+  "inference": {
+    "model_versions": {
+      "style_model": "style-distance-ja-v0.1",
+      "discourse_model": "discourse-graph-ja-v0.1",
+      "rhetoric_model": "rhetoric-profile-ja-v0.1"
+    },
+    "style_embedding": {
+      "vector_ref": "vecdb://fingerprints/sfp:kazene:note-0001",
+      "dimension": 768,
+      "similarity_metric": "cosine"
+    },
+    "discourse_graph": {
+      "graph_ref": "graphdb://fingerprints/sfp:kazene:note-0001",
+      "node_types": [
+        "claim",
+        "support",
+        "contrast",
+        "definition"
+      ],
+      "edge_types": [
+        "supports",
+        "contrasts",
+        "defines"
+      ],
+      "explanation_spans": [
+        {
+          "span_id": "sp1",
+          "start_char": 0,
+          "end_char": 84,
+          "mapped_node_id": "n1"
+        },
+        {
+          "span_id": "sp2",
+          "start_char": 85,
+          "end_char": 160,
+          "mapped_node_id": "n2"
+        }
+      ]
+    },
+    "rhetorical_profile": {
+      "operators": [
+        {
+          "name": "definition",
+          "weight": 0.28
+        },
+        {
+          "name": "contrast",
+          "weight": 0.19
+        },
+        {
+          "name": "generalization",
+          "weight": 0.17
+        }
+      ],
+      "distribution_sum_rule": "weights SHOULD sum approximately to 1.0"
+    }
+  },
+  "risk": {
+    "attack_risk": {
+      "obfuscation_score": 0.11,
+      "impersonation_score": 0.07,
+      "paraphrase_resilience": "medium"
+    },
+    "uncertainty": {
+      "confidence": 0.78,
+      "interval": {
+        "lower": 0.71,
+        "upper": 0.84
+      },
+      "model_disagreement": 0.13,
+      "notes": "No verified signature; inference derived from text only."
+    }
+  }
+}
