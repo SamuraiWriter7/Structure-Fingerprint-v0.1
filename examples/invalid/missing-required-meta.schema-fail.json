@@ -1,0 +1,18 @@
+{
+  "meta": {
+    "fingerprint_id": "sfp:kazene:invalid-0001",
+    "created_at": "2026-05-13T10:00:00Z"
+  },
+  "canon": {
+    "profile_id": "canon:text:default:v0.1",
+    "canonical_text_hash": {
+      "algorithm": "sha3-256",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "proof": {},
+  "inference": {
+    "model_versions": {}
+  },
+  "risk": {}
+}
