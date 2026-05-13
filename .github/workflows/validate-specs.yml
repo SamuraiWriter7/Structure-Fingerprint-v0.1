@@ -1,0 +1,328 @@
+name: Validate Structure Fingerprint Specs
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install validation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install jsonschema
+
+      - name: Debug file tree
+        run: |
+          echo "=== Repository root ==="
+          ls -la
+          echo
+          echo "=== schemas ==="
+          ls -la schemas || true
+          echo
+          echo "=== examples ==="
+          ls -la examples || true
+          echo
+          echo "=== examples/invalid ==="
+          ls -la examples/invalid || true
+          echo
+
+      - name: Validate schema, sample, and invalid test cases
+        run: |
+          python - <<'PY'
+          import json
+          import math
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema_path = Path("schemas/structure-fingerprint-v0.1.schema.json")
+          valid_sample_path = Path("examples/structure-fingerprint.sample.json")
+          invalid_dir = Path("examples/invalid")
+
+          def load_json(path: Path):
+              with path.open("r", encoding="utf-8") as f:
+                  return json.load(f)
+
+          def get_nested(obj, *keys):
+              cur = obj
+              for key in keys:
+                  if not isinstance(cur, dict) or key not in cur:
+                      return None
+                  cur = cur[key]
+              return cur
+
+          def schema_errors(schema, instance):
+              validator = Draft202012Validator(schema)
+              return sorted(
+                  validator.iter_errors(instance),
+                  key=lambda e: list(e.absolute_path)
+              )
+
+          def semantic_validate(instance):
+              errors = []
+              warnings = []
+
+              def add_error(msg):
+                  errors.append(msg)
+
+              def add_warning(msg):
+                  warnings.append(msg)
+
+              # 1. explanation_spans: end_char >= start_char
+              spans = get_nested(instance, "inference", "discourse_graph", "explanation_spans")
+              if isinstance(spans, list):
+                  for idx, span in enumerate(spans):
+                      start = span.get("start_char")
+                      end = span.get("end_char")
+                      if isinstance(start, int) and isinstance(end, int):
+                          if end < start:
+                              add_error(
+                                  f"inference.discourse_graph.explanation_spans[{idx}] "
+                                  f"has end_char ({end}) < start_char ({start})."
+                              )
+
+              # 2. uncertainty interval: upper >= lower
+              interval = get_nested(instance, "risk", "uncertainty", "interval")
+              if isinstance(interval, dict):
+                  lower = interval.get("lower")
+                  upper = interval.get("upper")
+                  if isinstance(lower, (int, float)) and isinstance(upper, (int, float)):
+                      if upper < lower:
+                          add_error(
+                              f"risk.uncertainty.interval has upper ({upper}) < lower ({lower})."
+                          )
+
+              # 3. rhetorical operator weights: approximately sum to 1.0
+              operators = get_nested(instance, "inference", "rhetorical_profile", "operators")
+              if isinstance(operators, list) and operators:
+                  weights = []
+                  for idx, op in enumerate(operators):
+                      weight = op.get("weight")
+                      if isinstance(weight, (int, float)):
+                          weights.append(float(weight))
+                      else:
+                          add_error(
+                              f"inference.rhetorical_profile.operators[{idx}].weight is missing or invalid."
+                          )
+
+                  total = sum(weights)
+                  tolerance = 0.05
+                  if not math.isclose(total, 1.0, abs_tol=tolerance):
+                      add_warning(
+                          f"Rhetorical operator weights sum to {total:.6f}, "
+                          f"outside recommended tolerance 1.0 ± {tolerance}."
+                      )
+
+              # 4. canon hash and proof hash consistency
+              canon_hash = get_nested(instance, "canon", "canonical_text_hash")
+              proof_hash = get_nested(instance, "proof", "hard_binding", "content_hash")
+              if isinstance(canon_hash, dict) and isinstance(proof_hash, dict):
+                  canon_alg = canon_hash.get("algorithm")
+                  canon_val = canon_hash.get("value")
+                  proof_alg = proof_hash.get("algorithm")
+                  proof_val = proof_hash.get("value")
+
+                  if canon_alg != proof_alg:
+                      add_warning(
+                          f"Hash algorithm mismatch between canon ({canon_alg}) and proof ({proof_alg})."
+                      )
+                  if canon_val != proof_val:
+                      add_warning(
+                          "Hash value mismatch between canon.canonical_text_hash and proof.hard_binding.content_hash."
+                      )
+
+              # 5. suspicious combinations
+              confidence = get_nested(instance, "risk", "uncertainty", "confidence")
+              disagreement = get_nested(instance, "risk", "uncertainty", "model_disagreement")
+              obfuscation = get_nested(instance, "risk", "attack_risk", "obfuscation_score")
+              impersonation = get_nested(instance, "risk", "attack_risk", "impersonation_score")
+
+              if isinstance(confidence, (int, float)) and isinstance(disagreement, (int, float)):
+                  if confidence > 0.95 and disagreement > 0.50:
+                      add_warning(
+                          "Suspicious combination: very high confidence with high model disagreement."
+                      )
+
+              if isinstance(confidence, (int, float)) and isinstance(obfuscation, (int, float)):
+                  if confidence > 0.90 and obfuscation > 0.70:
+                      add_warning(
+                          "Suspicious combination: very high confidence despite high obfuscation score."
+                      )
+
+              if isinstance(confidence, (int, float)) and isinstance(impersonation, (int, float)):
+                  if confidence > 0.90 and impersonation > 0.70:
+                      add_warning(
+                          "Suspicious combination: very high confidence despite high impersonation score."
+                      )
+
+              # 6. confidence inside interval
+              if (
+                  isinstance(confidence, (int, float))
+                  and isinstance(interval, dict)
+                  and isinstance(interval.get("lower"), (int, float))
+                  and isinstance(interval.get("upper"), (int, float))
+              ):
+                  lower = float(interval["lower"])
+                  upper = float(interval["upper"])
+                  if not (lower <= confidence <= upper):
+                      add_warning(
+                          f"Confidence ({confidence}) is outside the stated interval [{lower}, {upper}]."
+                      )
+
+              # 7. publication_time should not be later than created_at
+              created_at = get_nested(instance, "meta", "created_at")
+              publication_time = get_nested(instance, "proof", "provenance", "publication_time")
+              if created_at and publication_time:
+                  if publication_time > created_at:
+                      add_warning(
+                          "proof.provenance.publication_time is later than meta.created_at."
+                      )
+
+              return errors, warnings
+
+          print("=== Checking required files ===")
+          for p in [schema_path, valid_sample_path]:
+              if not p.exists():
+                  print(f"ERROR: Missing required file: {p}")
+                  raise SystemExit(1)
+              print(f"OK: Found {p}")
+
+          if not invalid_dir.exists():
+              print(f"ERROR: Missing invalid examples directory: {invalid_dir}")
+              raise SystemExit(1)
+
+          invalid_files = sorted(invalid_dir.glob("*.json"))
+          if not invalid_files:
+              print("ERROR: No invalid test files found in examples/invalid/")
+              raise SystemExit(1)
+
+          print()
+          print("=== Loading schema ===")
+          try:
+              schema = load_json(schema_path)
+              print(f"OK: Loaded schema: {schema_path}")
+          except json.JSONDecodeError as e:
+              print(f"ERROR: Invalid JSON in schema {schema_path}: {e}")
+              raise SystemExit(1)
+
+          print()
+          print("=== Positive test: valid sample MUST pass ===")
+          try:
+              valid_sample = load_json(valid_sample_path)
+          except json.JSONDecodeError as e:
+              print(f"ERROR: Invalid JSON in valid sample {valid_sample_path}: {e}")
+              raise SystemExit(1)
+
+          s_errors = schema_errors(schema, valid_sample)
+          if s_errors:
+              print("ERROR: Valid sample failed schema validation.")
+              for i, err in enumerate(s_errors, start=1):
+                  path = ".".join(str(p) for p in err.absolute_path) or "<root>"
+                  print(f"  {i}. {path}: {err.message}")
+              raise SystemExit(1)
+
+          sem_errors, sem_warnings = semantic_validate(valid_sample)
+          if sem_errors:
+              print("ERROR: Valid sample failed semantic validation.")
+              for i, msg in enumerate(sem_errors, start=1):
+                  print(f"  {i}. {msg}")
+              raise SystemExit(1)
+
+          print("OK: Valid sample passed schema validation.")
+          print("OK: Valid sample passed semantic validation.")
+          if sem_warnings:
+              print(f"NOTE: Valid sample produced {len(sem_warnings)} warning(s).")
+              for i, msg in enumerate(sem_warnings, start=1):
+                  print(f"  {i}. {msg}")
+
+          print()
+          print("=== Negative tests: invalid samples MUST fail ===")
+
+          failure_count = 0
+
+          for path in invalid_files:
+              print()
+              print(f"--- Testing {path} ---")
+
+              try:
+                  instance = load_json(path)
+              except json.JSONDecodeError as e:
+                  print(f"ERROR: Invalid JSON syntax in {path}: {e}")
+                  raise SystemExit(1)
+
+              s_errors = schema_errors(schema, instance)
+              sem_errors = []
+              sem_warnings = []
+
+              if not s_errors:
+                  sem_errors, sem_warnings = semantic_validate(instance)
+
+              is_schema_fail_case = ".schema-fail." in path.name
+              is_semantic_fail_case = ".semantic-fail." in path.name
+
+              if not (is_schema_fail_case or is_semantic_fail_case):
+                  print(f"ERROR: Invalid test file name must contain '.schema-fail.' or '.semantic-fail.': {path.name}")
+                  raise SystemExit(1)
+
+              if is_schema_fail_case:
+                  if not s_errors:
+                      print("ERROR: Expected schema failure, but schema validation passed.")
+                      if sem_errors:
+                          print("NOTE: Semantic errors existed, but this file is classified as schema-fail.")
+                      raise SystemExit(1)
+
+                  print("OK: Expected schema failure detected.")
+                  for i, err in enumerate(s_errors, start=1):
+                      p = ".".join(str(x) for x in err.absolute_path) or "<root>"
+                      print(f"  {i}. {p}: {err.message}")
+                  failure_count += 1
+
+              elif is_semantic_fail_case:
+                  if s_errors:
+                      print("ERROR: Expected semantic failure, but schema validation already failed.")
+                      for i, err in enumerate(s_errors, start=1):
+                          p = ".".join(str(x) for x in err.absolute_path) or "<root>"
+                          print(f"  {i}. {p}: {err.message}")
+                      raise SystemExit(1)
+
+                  if not sem_errors:
+                      print("ERROR: Expected semantic failure, but semantic validation passed.")
+                      if sem_warnings:
+                          print("Warnings found:")
+                          for i, msg in enumerate(sem_warnings, start=1):
+                              print(f"  {i}. {msg}")
+                      raise SystemExit(1)
+
+                  print("OK: Expected semantic failure detected.")
+                  for i, msg in enumerate(sem_errors, start=1):
+                      print(f"  {i}. {msg}")
+                  if sem_warnings:
+                      print("Warnings:")
+                      for i, msg in enumerate(sem_warnings, start=1):
+                          print(f"  {i}. {msg}")
+                  failure_count += 1
+
+          print()
+          print("=== Validation summary ===")
+          print(f"OK: Valid sample passed.")
+          print(f"OK: {failure_count} invalid test case(s) failed as expected.")
+          print("OK: Negative tests passed.")
+          PY
